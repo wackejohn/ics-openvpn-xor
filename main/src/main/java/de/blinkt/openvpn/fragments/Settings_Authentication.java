@@ -42,6 +42,7 @@ public class Settings_Authentication extends OpenVpnPreferencesFragment
     private String mTlsAuthFileData;
     private EditTextPreference mAuth;
     private EditTextPreference mRemoteX509Name;
+    private EditTextPreference mXorKey;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -71,6 +72,8 @@ public class Settings_Authentication extends OpenVpnPreferencesFragment
         mAuth = (EditTextPreference) findPreference("auth");
         mAuth.setOnPreferenceChangeListener(this);
 
+        mXorKey = (EditTextPreference) findPreference("xor_key");
+        mXorKey.setOnPreferenceChangeListener(this);
 
         loadSettings();
 
@@ -97,6 +100,9 @@ public class Settings_Authentication extends OpenVpnPreferencesFragment
         onPreferenceChange(mCipher, mProfile.mCipher);
         mAuth.setText(mProfile.mAuth);
         onPreferenceChange(mAuth, mProfile.mAuth);
+
+        mXorKey.setText(mProfile.mXorKey);
+        onPreferenceChange(mXorKey, mProfile.mXorKey);
 
         if (mProfile.mAuthenticationType == VpnProfile.TYPE_STATICKEYS) {
             mExpectTLSCert.setEnabled(false);
@@ -134,6 +140,12 @@ public class Settings_Authentication extends OpenVpnPreferencesFragment
             mProfile.mAuth = null;
         else
             mProfile.mAuth = mAuth.getText();
+
+        if (mXorKey.getText() == null)
+            mProfile.mXorKey = null;
+        else
+            mProfile.mXorKey = mXorKey.getText();
+
     }
 
 
@@ -155,7 +167,8 @@ public class Settings_Authentication extends OpenVpnPreferencesFragment
                 preference.setSummary(getX509String(authtype, dn));
             }
 
-        } else if (preference == mCipher || preference == mAuth) {
+        } else if (preference == mCipher || preference == mAuth
+                || preference == mXorKey) {
             preference.setSummary((CharSequence) newValue);
         } else if (preference == mRemoteX509Name) {
             preference.setSummary(TextUtils.isEmpty((CharSequence) newValue) ? "CN (default)" : (CharSequence) newValue);
