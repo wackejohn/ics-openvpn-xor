@@ -5,6 +5,9 @@ import de.blinkt.openvpn.R;
 import de.blinkt.openvpn.VpnProfile;
 import net.openvpn.ovpn3.*;
 
+import net.openvpn.ovpn3.ClientAPI_OpenVPNClient;
+
+import static de.blinkt.openvpn.VpnProfile.AUTH_RETRY_NOINTERACT;
 import static net.openvpn.ovpn3.ClientAPI_OpenVPNClient.copyright;
 import static net.openvpn.ovpn3.ClientAPI_OpenVPNClient.init_process;
 import static net.openvpn.ovpn3.ClientAPI_OpenVPNClient.platform;
@@ -12,9 +15,6 @@ import static net.openvpn.ovpn3.ClientAPI_OpenVPNClient.platform;
 public class OpenVPNThreadv3 extends ClientAPI_OpenVPNClient implements Runnable, OpenVPNManagement {
 
 	static {
-		/*System.loadLibrary("crypto");
-		System.loadLibrary("ssl");*/
-        //System.loadLibrary("polarssl-dynamic");
 		System.loadLibrary("ovpn3");
 	}
 
@@ -66,7 +66,7 @@ public class OpenVPNThreadv3 extends ClientAPI_OpenVPNClient implements Runnable
 		if(status.getError()) {
             VpnStatus.logError(String.format("connect() error: %s: %s",status.getStatus(),status.getMessage()));
 		} else {
-            VpnStatus.logDebug("OpenVPN3 thread finished");
+			VpnStatus.updateStateString("NOPROCESS", "OpenVPN3 thread finished", R.string.state_noprocess, ConnectionStatus.LEVEL_NOTCONNECTED);
 		}
 		statuspoller.stop();
 	}
@@ -187,6 +187,8 @@ public class OpenVPNThreadv3 extends ClientAPI_OpenVPNClient implements Runnable
 		config.setCompressionMode("asym");
 		config.setInfo(true);
 		config.setAllowLocalLanAccess(mVp.mAllowLocalLAN);
+		boolean retryOnAuthFailed= mVp.mAuthRetry == AUTH_RETRY_NOINTERACT;
+		config.setRetryOnAuthFailed(retryOnAuthFailed);
 
 		ClientAPI_EvalConfig ec = eval_config(config);
 		if(ec.getExternalPki()) {
@@ -223,14 +225,14 @@ public class OpenVPNThreadv3 extends ClientAPI_OpenVPNClient implements Runnable
 
 	@Override
 	public void external_pki_sign_request(ClientAPI_ExternalPKISignRequest signreq) {
-		VpnStatus.logDebug("Got external PKI signing request from OpenVPN core for algorithm " + signreq.getAlgorithm());
+		VpnStatus.logDebug("Got external PKI signing request from OpenVPN core for algorithm " + signreq.getPadding());
 		boolean pkcs1padding;
-		if (signreq.getAlgorithm().equals("RSA_PKCS1_PADDING"))
+		if (signreq.getPadding().equals("RSA_PKCS1_PADDING"))
 			pkcs1padding = true;
-		else if (signreq.getAlgorithm().equals("RSA_NO_PADDING"))
+		else if (signreq.getPadding().equals("RSA_NO_PADDING"))
 			pkcs1padding = false;
 		else
-			throw new IllegalArgumentException("Illegal padding in sign request" + signreq.getAlgorithm());
+			throw new IllegalArgumentException("Illegal padding in sign request" + signreq.getPadding());
 		signreq.setSig(mVp.getSignedData(mService, signreq.getData(), pkcs1padding));
 	}
 
@@ -245,7 +247,7 @@ public class OpenVPNThreadv3 extends ClientAPI_OpenVPNClient implements Runnable
 	}
 
 	@Override
-	public boolean socket_protect(int socket) {
+	public boolean socket_protect(int socket, String remote, boolean ipv6) {
 		boolean b= mService.protect(socket);
 		return b;
 
